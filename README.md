@@ -24,8 +24,13 @@ dados do Banco Central ──► regressão ► logística ► árvore ► flore
 2. Tenha o **Python 3.10 ou mais novo** ([python.org](https://www.python.org/downloads/), marque *Add python.exe to PATH*).
 3. Dois cliques em **`instalar.bat`** (cria o ambiente, instala as bibliotecas e escolhe sozinho o PyTorch
    certo: com placa NVIDIA ou só CPU).
+   **Espere aparecer "Pronto!" na janela** (o download do PyTorch pode levar vários minutos e a janela
+   fica parada, sem barra de progresso). Só então vá para o passo 4.
 4. Dois cliques em **`rodar.bat`**: baixa os dados mais novos do Banco Central e o mini-LLM escreve sobre o
    dia mais recente.
+
+Se o Windows mostrar "O Windows protegeu o computador", clique em **Mais informações → Executar assim mesmo**
+(acontece com qualquer `.bat` baixado da internet; o conteúdo é texto puro e você pode abrir no Bloco de Notas).
 
 > O **modelo já vem treinado** (`modelos/minillm.pt`, 13 MB). Você **não precisa treinar nada** para ver
 > funcionando. Treinar de novo é opcional: ~2 minutos numa placa NVIDIA e quase 3 horas só na CPU.

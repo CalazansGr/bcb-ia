@@ -4,8 +4,14 @@ setlocal
 cd /d "%~dp0"
 chcp 65001 >nul
 
-if not exist ".venv\Scripts\python.exe" (
-  echo Rode instalar.bat primeiro.
+if not exist ".venv\instalado.ok" (
+  echo.
+  echo A instalacao ainda nao terminou ^(ou falhou^).
+  echo.
+  echo  1. Rode o instalar.bat
+  echo  2. ESPERE aparecer a palavra "Pronto!" na janela dele
+  echo  3. So depois abra este rodar.bat
+  echo.
   pause
   exit /b 1
 )
