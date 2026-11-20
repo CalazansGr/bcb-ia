@@ -7,10 +7,9 @@ modelo escreve de novo (até `tentativas` vezes). Nada é inventado nem "corrigi
 from __future__ import annotations
 
 import math
-import re
 import time
 from dataclasses import asdict
-from datetime import date, timedelta
+from datetime import date
 from pathlib import Path
 
 import torch
@@ -19,6 +18,7 @@ from src import bcb
 
 from .corpus import FIM, LIMIAR_ESTAVEL, LIMIAR_NEUTRO, _br, montar_documentos, montar_registros, prompt_dados
 from .modelo import Config, MiniGPT
+from .perguntas import Base, interpretar
 
 CKPT = Path(__file__).resolve().parent.parent / "modelos" / "minillm.pt"
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
@@ -178,43 +178,6 @@ def carregar_modelo():
     return modelo, stoi, {i: c for c, i in stoi.items()}
 
 
-_DIAS = ["segunda-feira", "terça-feira", "quarta-feira", "quinta-feira", "sexta-feira", "sábado", "domingo"]
-
-
-def _extrair_data(texto: str, hoje: date) -> date | None:
-    """Acha uma data no texto: 17/11/2026, 2026-11-17, 'hoje' ou 'ontem'. Devolve None se não achar."""
-    t = texto.lower()
-    if "hoje" in t:
-        return hoje
-    if "ontem" in t:
-        return hoje - timedelta(days=1)
-    try:
-        m = re.search(r"(\d{1,2})/(\d{1,2})/(\d{4})", t)
-        if m:
-            return date(int(m[3]), int(m[2]), int(m[1]))
-        m = re.search(r"(\d{4})-(\d{1,2})-(\d{1,2})", t)
-        if m:
-            return date(int(m[1]), int(m[2]), int(m[3]))
-    except ValueError:  # ex.: 31/02/2026
-        return None
-    return None
-
-
-def _registro_da_data(por_data: dict, d: date):
-    """Devolve (registro, aviso). Sem dado na data (fim de semana, feriado, futuro), usa o dia útil anterior."""
-    primeiro, ultimo = min(por_data), max(por_data)
-    if d < primeiro:
-        return None, f"Os dados começam em {primeiro:%d/%m/%Y}."
-    if d > ultimo:
-        return por_data[ultimo], (f"Ainda não há dado para {d:%d/%m/%Y}. "
-                                  f"Usando o dia mais recente: {ultimo:%d/%m/%Y}.")
-    if d not in por_data:
-        anterior = max(x for x in por_data if x < d)
-        return por_data[anterior], (f"Sem cotação em {d:%d/%m/%Y} ({_DIAS[d.weekday()]}: fim de semana ou feriado). "
-                                    f"Usando o dia útil anterior: {anterior:%d/%m/%Y}.")
-    return por_data[d], ""
-
-
 def _boletim(modelo, stoi, itos, r, temperatura: float = 0.7) -> str:
     t, tent, ok = escrever_confiavel(modelo, stoi, itos, r, temperatura=temperatura)
     sel = "conferem com os dados" if ok else "NÃO conferem (descarte este texto)"
@@ -222,38 +185,37 @@ def _boletim(modelo, stoi, itos, r, temperatura: float = 0.7) -> str:
 
 
 def escrever(n: int = 3, temperatura: float = 0.7, data: str | None = None) -> None:
-    """Escreve n textos sobre o dia mais recente do Banco Central, ou sobre a `data` pedida."""
+    """Escreve n textos sobre o dia mais recente do Banco Central, ou sobre o dia pedido em `data`
+    (aceita tudo o que o modo de conversa aceita: 17/11/2026, "semana passada", "maior alta de 2025"...)."""
     modelo, stoi, itos = carregar_modelo()
-    por_data = {r.data.date(): r for r in _registros().itertuples()}
+    base = Base(_registros())
     if data:
-        d = _extrair_data(data, date.today())
-        if d is None:
-            raise SystemExit("Não entendi a data. Use, por exemplo, 17/11/2026 ou 2026-11-17.")
-        r, aviso = _registro_da_data(por_data, d)
-        if r is None:
-            raise SystemExit(aviso)
-        if aviso:
-            print(aviso)
+        esc = interpretar(data, base, date.today())
+        if esc.registro is None:
+            raise SystemExit(esc.mensagem)
+        print(esc.explicacao)
+        r = esc.registro
     else:
-        r = por_data[max(por_data)]
+        r = base.por_data[base.ultimo]
     print(prompt_dados(r).split("\n")[0], "\n")
     for k in range(n):
         print(f"[{k+1}] {_boletim(modelo, stoi, itos, r, temperatura)}\n")
 
 
 def conversar() -> None:
-    """Modo 'pergunte por data': você digita uma data e o mini-LLM escreve o boletim daquele dia.
-    NÃO entende perguntas livres: só acha a data no que você digita e busca os dados reais dela."""
+    """Modo de conversa: você pede um dia ("17/11/2026", "semana passada", "maior alta de 2025"...) e o
+    mini-LLM escreve o boletim dele. NÃO é um chat livre: regras simples (minillm/perguntas.py) escolhem o dia
+    nos dados reais; quem escreve o texto é o mini-LLM."""
     modelo, stoi, itos = carregar_modelo()
-    por_data = {r.data.date(): r for r in _registros().itertuples()}
-    primeiro, ultimo = min(por_data), max(por_data)
-    print("=" * 66)
-    print(" Mini-LLM do Banco Central: digite uma DATA e ele escreve o boletim.")
-    print(f" Dados reais de {primeiro:%d/%m/%Y} a {ultimo:%d/%m/%Y}.")
-    print(" Exemplos: 17/11/2026   |   2026-03-02   |   hoje   |   ontem   |   sair")
-    print(" Atenção: ele NÃO entende perguntas livres, só acha a data no que você")
-    print(" digita. Para perguntas em português, use o chat com o Claude (run.py chat).")
-    print("=" * 66)
+    base = Base(_registros())
+    print("=" * 70)
+    print(" Mini-LLM do Banco Central: peça um dia e ele escreve o boletim.")
+    print(f" Dados reais de {base.primeiro:%d/%m/%Y} a {base.ultimo:%d/%m/%Y}.")
+    print(" Exemplos:  17/11/2026  |  ontem  |  semana passada  |  novembro de 2025")
+    print("            maior alta de 2025  |  dólar mais caro de 2024  |  sair")
+    print(" Atenção: não é um chat livre. Ele reconhece só esses tipos de pedido")
+    print(" (regras simples); quem escreve o texto é o mini-LLM.")
+    print("=" * 70)
     while True:
         try:
             s = input("\ndata> ").strip()
@@ -263,15 +225,11 @@ def conversar() -> None:
             break
         if not s:
             continue
-        d = _extrair_data(s, date.today())
-        if d is None:
-            print("Não achei uma data. Exemplos: 17/11/2026, 2026-03-02, hoje, ontem.")
+        esc = interpretar(s, base, date.today())
+        if esc.registro is None:
+            print(esc.mensagem)
             continue
-        r, aviso = _registro_da_data(por_data, d)
-        if r is None:
-            print(aviso)
-            continue
-        if aviso:
-            print(aviso)
+        r = esc.registro
+        print(f"\n{esc.explicacao}")
         print(f"\n{prompt_dados(r).split(chr(10))[0]}")
         print(f"\n{_boletim(modelo, stoi, itos, r)}")

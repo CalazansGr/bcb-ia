@@ -24,8 +24,8 @@ que confere os números e o sentido das palavras contra os dados do Banco Centra
 
 ![O mini-LLM escreve sobre o dia mais recente](docs/exemplo-escrever.png)
 
-No modo "pergunte por data" (`conversar.bat`), você digita uma data. Em fim de semana ou feriado ele usa o dia
-útil anterior:
+No modo de conversa (`conversar.bat`), você pede um dia: uma data, "semana passada", "maior alta de 2025"...
+O programa mostra como entendeu o pedido (linha laranja) e o mini-LLM escreve o boletim daquele dia:
 
 ![Modo pergunte por data](docs/exemplo-conversar.png)
 
@@ -44,8 +44,8 @@ No modo "pergunte por data" (`conversar.bat`), você digita uma data. Em fim de 
    fica parada, sem barra de progresso). Só então vá para o passo 4.
 4. Dois cliques em **`rodar.bat`**: baixa os dados mais novos do Banco Central e o mini-LLM escreve sobre o
    dia mais recente.
-5. (Opcional) Dois cliques em **`conversar.bat`**: você digita uma data (ex.: `17/11/2026`) e o mini-LLM
-   escreve o boletim daquele dia, com os dados reais dela.
+5. (Opcional) Dois cliques em **`conversar.bat`**: você pede um dia (ex.: `17/11/2026`, `semana passada`,
+   `maior alta de 2025`) e o mini-LLM escreve o boletim dele, com os dados reais.
 
 Se o Windows mostrar "O Windows protegeu o computador", clique em **Mais informações → Executar assim mesmo**
 (acontece com qualquer `.bat` baixado da internet; o conteúdo é texto puro e você pode abrir no Bloco de Notas).
@@ -112,7 +112,7 @@ python run.py prever --dias 5    # previsão do dólar com faixa de incerteza
 python run.py regimes            # k-means: o dólar está calmo, intermediário ou agitado?
 python run.py llm-escrever       # o mini-LLM escreve sobre o dia mais recente do BC
 python run.py llm-escrever --data 17/11/2026   # ...ou sobre uma data específica
-python run.py llm-conversar      # você digita datas, ele escreve o boletim de cada uma
+python run.py llm-conversar      # você pede um dia (data, "semana passada", "maior alta de 2025"...)
 python run.py llm-avaliar        # mede a fidelidade do mini-LLM em dias que ele nunca viu
 python run.py llm-treinar        # (opcional) treina o mini-LLM do zero
 python run.py chat               # (opcional) conversa com o Claude usando esses dados
@@ -193,11 +193,19 @@ próximo caractere. Recebe uma linha de dados do Banco Central e continua escrev
 entre números e palavras. Ele **não analisa nem prevê** nada, e só sabe escrever esse tipo de boletim sobre
 dólar, Selic e IPCA. Para outra fonte de dados é preciso definir os campos e as frases e treinar de novo.
 
-**Dá para conversar com ele?** Só no formato "pergunte por data" (`conversar.bat` ou `python run.py llm-conversar`):
-você digita uma data, o programa busca os dados reais daquele dia e o mini-LLM escreve o boletim. Fim de semana
-ou feriado usa o dia útil anterior; data futura usa o dia mais recente. Ele **não entende perguntas livres**
-(só encontra a data no que você digita). Para perguntar em português, como "o dólar está caro?", use o chat com o
-Claude (`python run.py chat`), que consulta estes mesmos dados por ferramentas.
+**Dá para interagir com ele?** Sim, em um modo de conversa limitado (`conversar.bat` ou
+`python run.py llm-conversar`). Você pede um **dia**; o mini-LLM escreve o boletim dele:
+
+| Você digita | O que acontece |
+|---|---|
+| `17/11/2026`, `2026-03-02`, `17 de março`, `ontem`, `hoje` | usa esse dia (fim de semana ou feriado: o dia útil anterior) |
+| `semana passada`, `mês passado`, `novembro de 2025` | o último dia útil com dado desse período |
+| `maior alta`, `maior queda`, `dólar mais caro`, `dólar mais barato` | acha o recorde nos dados reais, no período pedido (`de 2025`, `este ano`, `últimos 30 dias`...) |
+
+O programa sempre mostra **como entendeu o pedido**. Quem escolhe o dia são **regras simples**
+(`minillm/perguntas.py`, expressões regulares, **sem IA**); quem **escreve o texto** é o mini-LLM. Frases fora desses
+tipos ("quanto fecha amanhã?") ele não entende e lista o que reconhece. Para perguntas livres em português existe
+o chat com o Claude (`python run.py chat`, opcional, precisa de chave de API).
 
 **O verificador:** depois que o modelo escreve, um código confere o texto contra os dados reais. Se algum
 número ou sentido estiver errado, o texto é descartado e ele escreve de novo. Nada é inventado nem corrigido à mão.
@@ -211,7 +219,7 @@ intermediária que cita o número e o sinal.
 ```
 instalar.bat        # instala tudo (Windows, dois cliques)
 rodar.bat           # atualiza os dados e roda o mini-LLM (Windows, dois cliques)
-conversar.bat       # você digita uma data e o mini-LLM escreve o boletim (Windows, dois cliques)
+conversar.bat       # você pede um dia e o mini-LLM escreve o boletim (Windows, dois cliques)
 run.py              # comandos
 modelos/minillm.pt  # mini-LLM já treinado (13 MB)
 src/bcb.py          # coleta da API do Banco Central (+ cache)
@@ -220,6 +228,7 @@ src/modelos.py      # algoritmos 1 a 8, avaliação e k-means
 src/previsao.py     # previsão de vários dias com faixa de incerteza
 src/chat.py         # chat com o Claude (opcional)
 minillm/corpus.py   # dados -> texto de treino
+minillm/perguntas.py # entende o pedido ("semana passada", "maior alta") e escolhe o dia (regras simples)
 minillm/modelo.py   # o mini-GPT
 minillm/treino.py   # treino, verificador, fidelidade e geração
 docs/ESCADINHA.md   # os 9 algoritmos explicados
