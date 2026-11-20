@@ -1,0 +1,7 @@
+# O PyTorch (para o mini-LLM) é instalado à parte, veja o README:
+#   com placa NVIDIA: pip install torch --index-url https://download.pytorch.org/whl/cu124
+#   sem placa (CPU):  pip install torch
+# O chat opcional com o Claude tem a própria lista: requirements-chat.txt
+pandas
+scikit-learn
+requests

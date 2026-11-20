@@ -1,0 +1,3 @@
+# Só para o chat opcional (python run.py chat). Precisa de ANTHROPIC_API_KEY no .env
+anthropic
+python-dotenv

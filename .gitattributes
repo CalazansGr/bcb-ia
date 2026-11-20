@@ -1,0 +1,2 @@
+# Os scripts do Windows precisam ficar com quebra de linha CRLF exatamente como estao (inclusive no Download ZIP).
+*.bat -text

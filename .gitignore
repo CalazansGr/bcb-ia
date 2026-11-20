@@ -1,0 +1,14 @@
+# segredos: NUNCA suba a chave de API
+.env
+
+# ambiente e cache do Python
+.venv/
+venv/
+__pycache__/
+*.pyc
+
+# dados baixados do Banco Central (são recriados a cada execução)
+data/
+
+# plano pessoal de trabalho (não é parte do projeto público)
+PLANO.md
