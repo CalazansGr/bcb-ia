@@ -17,6 +17,22 @@ dados do Banco Central ──► regressão ► logística ► árvore ► flore
                                   "No pregão de 19/11/2026, o dólar disparou 1,35% e fechou a R$ 5,8889..." ◄─┘
 ```
 
+## Exemplo
+
+O mini-LLM recebe os dados reais do dia (linha azul) e escreve o boletim. Cada texto passa por um verificador
+que confere os números e o sentido das palavras contra os dados do Banco Central (linha verde):
+
+![O mini-LLM escreve sobre o dia mais recente](docs/exemplo-escrever.png)
+
+No modo "pergunte por data" (`conversar.bat`), você digita uma data. Em fim de semana ou feriado ele usa o dia
+útil anterior:
+
+![Modo pergunte por data](docs/exemplo-conversar.png)
+
+> As imagens são a saída real dos comandos `python run.py llm-escrever` e `python run.py llm-conversar`,
+> redesenhadas como imagem de terminal para ficarem legíveis. Como o modelo sorteia as palavras, a redação
+> muda a cada execução; os números sempre vêm dos dados do Banco Central.
+
 ## Jeito mais fácil (Windows, sem digitar comandos)
 
 1. Neste repositório, clique em **Code → Download ZIP** e extraia em uma pasta de **caminho curto**
