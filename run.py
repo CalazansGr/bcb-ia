@@ -7,6 +7,8 @@
   python run.py chat                 # conversa com a IA (precisa de ANTHROPIC_API_KEY)
   python run.py llm-treinar          # treina o mini-LLM do zero (GPU NVIDIA)
   python run.py llm-escrever         # o mini-LLM escreve sobre o dia mais recente do BC
+  python run.py llm-escrever --data 17/11/2026   # ...ou sobre uma data específica
+  python run.py llm-conversar        # você digita datas e ele escreve o boletim de cada uma
   python run.py llm-avaliar          # mede a fidelidade do mini-LLM em dias que ele nunca viu
 """
 import argparse
@@ -28,7 +30,8 @@ pd.set_option("display.width", 140)
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("comando", choices=["atualizar", "avaliar", "prever", "regimes", "chat",
-                                        "llm-treinar", "llm-escrever", "llm-avaliar"])
+                                        "llm-treinar", "llm-escrever", "llm-avaliar", "llm-conversar"])
+    ap.add_argument("--data", default=None, help="data do boletim do mini-LLM (ex.: 17/11/2026)")
     ap.add_argument("--dias", type=int, default=5)
     ap.add_argument("--passos", type=int, default=2500, help="passos de treino do mini-LLM")
     ap.add_argument("--modelo", default="regressao_linear", choices=MODELOS_PREVISAO)
@@ -42,7 +45,10 @@ def main() -> None:
         return treinar(passos=a.passos)
     if a.comando == "llm-escrever":
         from minillm.treino import escrever
-        return escrever()
+        return escrever(data=a.data)
+    if a.comando == "llm-conversar":
+        from minillm.treino import conversar
+        return conversar()
     if a.comando == "llm-avaliar":
         from minillm.treino import avaliar_fidelidade
         return avaliar_fidelidade()

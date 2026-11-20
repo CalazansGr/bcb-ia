@@ -7,8 +7,10 @@ modelo escreve de novo (até `tentativas` vezes). Nada é inventado nem "corrigi
 from __future__ import annotations
 
 import math
+import re
 import time
 from dataclasses import asdict
+from datetime import date, timedelta
 from pathlib import Path
 
 import torch
@@ -176,12 +178,100 @@ def carregar_modelo():
     return modelo, stoi, {i: c for c, i in stoi.items()}
 
 
-def escrever(n: int = 3, temperatura: float = 0.7) -> None:
-    """Escreve n textos sobre o dia MAIS RECENTE do Banco Central (dados atualizados agora)."""
+_DIAS = ["segunda-feira", "terça-feira", "quarta-feira", "quinta-feira", "sexta-feira", "sábado", "domingo"]
+
+
+def _extrair_data(texto: str, hoje: date) -> date | None:
+    """Acha uma data no texto: 17/11/2026, 2026-11-17, 'hoje' ou 'ontem'. Devolve None se não achar."""
+    t = texto.lower()
+    if "hoje" in t:
+        return hoje
+    if "ontem" in t:
+        return hoje - timedelta(days=1)
+    try:
+        m = re.search(r"(\d{1,2})/(\d{1,2})/(\d{4})", t)
+        if m:
+            return date(int(m[3]), int(m[2]), int(m[1]))
+        m = re.search(r"(\d{4})-(\d{1,2})-(\d{1,2})", t)
+        if m:
+            return date(int(m[1]), int(m[2]), int(m[3]))
+    except ValueError:  # ex.: 31/02/2026
+        return None
+    return None
+
+
+def _registro_da_data(por_data: dict, d: date):
+    """Devolve (registro, aviso). Sem dado na data (fim de semana, feriado, futuro), usa o dia útil anterior."""
+    primeiro, ultimo = min(por_data), max(por_data)
+    if d < primeiro:
+        return None, f"Os dados começam em {primeiro:%d/%m/%Y}."
+    if d > ultimo:
+        return por_data[ultimo], (f"Ainda não há dado para {d:%d/%m/%Y}. "
+                                  f"Usando o dia mais recente: {ultimo:%d/%m/%Y}.")
+    if d not in por_data:
+        anterior = max(x for x in por_data if x < d)
+        return por_data[anterior], (f"Sem cotação em {d:%d/%m/%Y} ({_DIAS[d.weekday()]}: fim de semana ou feriado). "
+                                    f"Usando o dia útil anterior: {anterior:%d/%m/%Y}.")
+    return por_data[d], ""
+
+
+def _boletim(modelo, stoi, itos, r, temperatura: float = 0.7) -> str:
+    t, tent, ok = escrever_confiavel(modelo, stoi, itos, r, temperatura=temperatura)
+    sel = "conferem com os dados" if ok else "NÃO conferem (descarte este texto)"
+    return f"{t}\n    números {sel} (tentativa {tent} de {TENTATIVAS})"
+
+
+def escrever(n: int = 3, temperatura: float = 0.7, data: str | None = None) -> None:
+    """Escreve n textos sobre o dia mais recente do Banco Central, ou sobre a `data` pedida."""
     modelo, stoi, itos = carregar_modelo()
-    r = list(_registros().itertuples())[-1]
+    por_data = {r.data.date(): r for r in _registros().itertuples()}
+    if data:
+        d = _extrair_data(data, date.today())
+        if d is None:
+            raise SystemExit("Não entendi a data. Use, por exemplo, 17/11/2026 ou 2026-11-17.")
+        r, aviso = _registro_da_data(por_data, d)
+        if r is None:
+            raise SystemExit(aviso)
+        if aviso:
+            print(aviso)
+    else:
+        r = por_data[max(por_data)]
     print(prompt_dados(r).split("\n")[0], "\n")
     for k in range(n):
-        t, tent, ok = escrever_confiavel(modelo, stoi, itos, r, temperatura=temperatura)
-        sel = "conferem com os dados" if ok else "NÃO conferem (descartar este texto)"
-        print(f"[{k+1}] {t}\n    números {sel} (tentativa {tent} de {TENTATIVAS})\n")
+        print(f"[{k+1}] {_boletim(modelo, stoi, itos, r, temperatura)}\n")
+
+
+def conversar() -> None:
+    """Modo 'pergunte por data': você digita uma data e o mini-LLM escreve o boletim daquele dia.
+    NÃO entende perguntas livres: só acha a data no que você digita e busca os dados reais dela."""
+    modelo, stoi, itos = carregar_modelo()
+    por_data = {r.data.date(): r for r in _registros().itertuples()}
+    primeiro, ultimo = min(por_data), max(por_data)
+    print("=" * 66)
+    print(" Mini-LLM do Banco Central: digite uma DATA e ele escreve o boletim.")
+    print(f" Dados reais de {primeiro:%d/%m/%Y} a {ultimo:%d/%m/%Y}.")
+    print(" Exemplos: 17/11/2026   |   2026-03-02   |   hoje   |   ontem   |   sair")
+    print(" Atenção: ele NÃO entende perguntas livres, só acha a data no que você")
+    print(" digita. Para perguntas em português, use o chat com o Claude (run.py chat).")
+    print("=" * 66)
+    while True:
+        try:
+            s = input("\ndata> ").strip()
+        except (EOFError, KeyboardInterrupt):
+            break
+        if s.lower() in {"sair", "exit", "quit", "q"}:
+            break
+        if not s:
+            continue
+        d = _extrair_data(s, date.today())
+        if d is None:
+            print("Não achei uma data. Exemplos: 17/11/2026, 2026-03-02, hoje, ontem.")
+            continue
+        r, aviso = _registro_da_data(por_data, d)
+        if r is None:
+            print(aviso)
+            continue
+        if aviso:
+            print(aviso)
+        print(f"\n{prompt_dados(r).split(chr(10))[0]}")
+        print(f"\n{_boletim(modelo, stoi, itos, r)}")
