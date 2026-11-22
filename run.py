@@ -8,7 +8,8 @@
   python run.py llm-treinar          # treina o mini-LLM do zero (GPU NVIDIA)
   python run.py llm-escrever         # o mini-LLM escreve sobre o dia mais recente do BC
   python run.py llm-escrever --data 17/11/2026   # ...ou sobre uma data específica
-  python run.py llm-conversar        # você digita datas e ele escreve o boletim de cada uma
+  python run.py llm-conversar        # você pede um dia (data, "semana passada", "maior alta de 2025"...)
+  python run.py web                  # interface web local: calendário, gráfico e boletim
   python run.py llm-avaliar          # mede a fidelidade do mini-LLM em dias que ele nunca viu
 """
 import argparse
@@ -30,7 +31,9 @@ pd.set_option("display.width", 140)
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("comando", choices=["atualizar", "avaliar", "prever", "regimes", "chat",
-                                        "llm-treinar", "llm-escrever", "llm-avaliar", "llm-conversar"])
+                                        "llm-treinar", "llm-escrever", "llm-avaliar", "llm-conversar", "web"])
+    ap.add_argument("--porta", type=int, default=8765, help="porta da interface web")
+    ap.add_argument("--sem-navegador", action="store_true", help="não abre o navegador sozinho (comando web)")
     ap.add_argument("--data", default=None, help="data do boletim do mini-LLM (ex.: 17/11/2026)")
     ap.add_argument("--dias", type=int, default=5)
     ap.add_argument("--passos", type=int, default=2500, help="passos de treino do mini-LLM")
@@ -46,6 +49,9 @@ def main() -> None:
     if a.comando == "llm-escrever":
         from minillm.treino import escrever
         return escrever(data=a.data)
+    if a.comando == "web":
+        from minillm.web import servir
+        return servir(porta=a.porta, abrir=not a.sem_navegador)
     if a.comando == "llm-conversar":
         from minillm.treino import conversar
         return conversar()

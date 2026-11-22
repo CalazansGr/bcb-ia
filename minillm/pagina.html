@@ -1,0 +1,263 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mini-LLM do Banco Central</title>
+<style>
+  :root {
+    color-scheme: light dark;
+    --fundo: #f6f7f9; --painel: #ffffff; --texto: #1c2430; --suave: #5b6675; --borda: #dde2e9;
+    --acento: #2563eb; --acento-fundo: #e8efff; --ok: #137a3a; --ok-fundo: #e3f6ea;
+    --erro: #b42318; --erro-fundo: #fdecea; --nota: #8a5300; --nota-fundo: #fff3df;
+    --linha: #2563eb; --area: rgba(37, 99, 235, .12);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --fundo: #0f141b; --painel: #171e28; --texto: #e6ebf2; --suave: #9aa6b5; --borda: #2a3442;
+      --acento: #6ea0ff; --acento-fundo: #1b2a47; --ok: #5fd68a; --ok-fundo: #16301f;
+      --erro: #ff8f86; --erro-fundo: #3a1b19; --nota: #f3b765; --nota-fundo: #382a12;
+      --linha: #6ea0ff; --area: rgba(110, 160, 255, .15);
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--fundo); color: var(--texto);
+         font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  main { max-width: 880px; margin: 0 auto; padding: 28px 16px 48px; }
+  h1 { font-size: 1.6rem; margin: 0 0 4px; }
+  .sub { color: var(--suave); margin: 0 0 20px; }
+  .painel { background: var(--painel); border: 1px solid var(--borda); border-radius: 14px; padding: 18px; margin-bottom: 16px; }
+  form { display: flex; gap: 8px; flex-wrap: wrap; }
+  input[type=text] { flex: 1 1 260px; min-width: 0; }
+  input, button { font: inherit; color: inherit; }
+  input[type=text], input[type=date] { padding: 10px 12px; border-radius: 10px; border: 1px solid var(--borda);
+        background: var(--fundo); }
+  input:focus-visible, button:focus-visible { outline: 2px solid var(--acento); outline-offset: 2px; }
+  button { padding: 10px 16px; border-radius: 10px; border: 1px solid var(--borda); background: var(--painel); cursor: pointer; }
+  button.principal { background: var(--acento); border-color: var(--acento); color: #fff; font-weight: 600; }
+  @media (prefers-color-scheme: dark) { button.principal { color: #0b1220; } }
+  button:disabled { opacity: .55; cursor: progress; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; align-items: center; }
+  .chips span.rot { color: var(--suave); font-size: .85rem; margin-right: 2px; }
+  .chip { padding: 4px 10px; font-size: .85rem; border-radius: 999px; background: var(--acento-fundo); border-color: transparent; }
+  label.data { display: inline-flex; gap: 8px; align-items: center; color: var(--suave); font-size: .9rem; margin-top: 12px; }
+  .nota { background: var(--nota-fundo); color: var(--nota); border-radius: 10px; padding: 9px 12px; font-size: .92rem; }
+  .erro { background: var(--erro-fundo); color: var(--erro); border-radius: 10px; padding: 12px; white-space: pre-wrap; }
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(125px, 1fr)); gap: 10px; margin: 14px 0 4px; }
+  .card { border: 1px solid var(--borda); border-radius: 12px; padding: 10px 12px; }
+  .card small { display: block; color: var(--suave); font-size: .78rem; text-transform: uppercase; letter-spacing: .03em; }
+  .card b { font-size: 1.1rem; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .grafico-topo { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .grafico-topo h2, .boletim-topo h2 { font-size: 1rem; margin: 0; }
+  .faixas button { padding: 4px 10px; font-size: .82rem; }
+  .faixas button[aria-pressed=true] { background: var(--acento-fundo); border-color: var(--acento); }
+  svg { width: 100%; height: auto; display: block; margin-top: 8px; }
+  .boletim { font-size: 1.12rem; line-height: 1.65; border-left: 4px solid var(--acento); padding: 4px 0 4px 14px; margin: 12px 0; }
+  .selo { display: inline-block; padding: 3px 10px; border-radius: 999px; font-size: .85rem; font-weight: 600; }
+  .selo.ok { background: var(--ok-fundo); color: var(--ok); } .selo.ruim { background: var(--erro-fundo); color: var(--erro); }
+  .boletim-topo { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .dados { font: .82rem/1.4 ui-monospace, Consolas, monospace; color: var(--suave); overflow-wrap: anywhere; }
+  footer { color: var(--suave); font-size: .85rem; }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Mini-LLM do Banco Central</h1>
+  <p class="sub">Um modelo de linguagem feito do zero que escreve o boletim do dólar, da Selic e do IPCA a partir de dados reais.</p>
+
+  <section class="painel" aria-label="Pedido">
+    <form id="form">
+      <input type="text" id="pedido" maxlength="200" autocomplete="off" aria-label="O que você quer saber"
+             placeholder="Ex.: semana passada, maior alta de 2025, 17/11/2026">
+      <button class="principal" id="enviar" type="submit">Escrever boletim</button>
+    </form>
+    <div class="chips" id="chips"><span class="rot">Experimente:</span></div>
+    <label class="data">ou escolha um dia no calendário:
+      <input type="date" id="data" aria-label="Escolher um dia"></label>
+  </section>
+
+  <div id="resultado" aria-live="polite" aria-busy="false">
+    <section class="painel" id="carregando" hidden>O mini-LLM está escrevendo…</section>
+    <section class="painel erro" id="erro" hidden></section>
+
+    <section id="conteudo" hidden>
+      <div class="painel">
+        <div class="nota" id="explicacao"></div>
+        <div class="cards" id="cards"></div>
+      </div>
+
+      <div class="painel">
+        <div class="grafico-topo">
+          <h2>Dólar PTAX (venda) ao redor do dia escolhido</h2>
+          <div class="faixas" id="faixas" role="group" aria-label="Janela do gráfico"></div>
+        </div>
+        <div id="grafico" role="img" aria-label="Gráfico do dólar"></div>
+      </div>
+
+      <div class="painel">
+        <div class="boletim-topo">
+          <h2>Boletim escrito pelo mini-LLM</h2>
+          <span class="selo" id="selo"></span>
+        </div>
+        <p class="boletim" id="texto"></p>
+        <button id="denovo" type="button">Escrever de novo</button>
+        <p class="dados" id="dados"></p>
+      </div>
+    </section>
+  </div>
+
+  <footer>
+    <p id="rodape"></p>
+    <p>Não é um chat livre: regras simples escolhem o dia nos dados reais e o mini-LLM escreve o texto. Cada texto é
+       conferido contra os dados do Banco Central. Projeto educacional, não é recomendação de investimento.</p>
+  </footer>
+</main>
+
+<script>
+const $ = (s) => document.querySelector(s);
+const FAIXAS = [["6 meses", 180], ["1 ano", 365], ["5 anos", 1825], ["Tudo", 9000]];
+let janela = 365, ultimoPedido = "", atual = null, ocupado = false;
+
+const num = (x, c = 2) => x.toLocaleString("pt-BR", { minimumFractionDigits: c, maximumFractionDigits: c });
+const pct = (x) => (x > 0 ? "+" : "") + num(x) + "%";
+const seta = (x) => (x > 0 ? "▲ " : x < 0 ? "▼ " : "") + pct(x);  // setas neutras: não dizem se alta é boa ou ruim
+const dataBR = (iso) => iso.split("-").reverse().join("/");
+
+async function api(url) {
+  const r = await fetch(url);
+  return r.json();
+}
+
+function ocupar(sim) {
+  ocupado = sim;
+  $("#resultado").setAttribute("aria-busy", String(sim));
+  $("#enviar").disabled = sim; $("#denovo").disabled = sim;
+  $("#carregando").hidden = !sim;
+}
+
+async function pedir(texto) {
+  texto = texto.trim();
+  if (!texto || ocupado) return;
+  ocupar(true); $("#erro").hidden = true;
+  try {
+    const d = await api("/api/boletim?pedido=" + encodeURIComponent(texto));
+    if (!d.ok) { $("#conteudo").hidden = true; mostrarErro(d.mensagem); return; }
+    ultimoPedido = texto; atual = d;
+    desenharResultado(d);
+    await desenharGrafico(d.registro.data);
+  } catch (e) {
+    $("#conteudo").hidden = true; mostrarErro("Não consegui falar com o servidor local: " + e);
+  } finally { ocupar(false); }
+}
+
+function mostrarErro(msg) { const e = $("#erro"); e.textContent = msg; e.hidden = false; }
+
+function card(rotulo, valor, classe) {
+  const c = document.createElement("div"); c.className = "card";
+  const s = document.createElement("small"); s.textContent = rotulo;
+  const b = document.createElement("b"); b.textContent = valor; if (classe) b.className = classe;
+  c.append(s, b); return c;
+}
+
+function desenharResultado(d) {
+  const r = d.registro;
+  $("#conteudo").hidden = false;
+  $("#explicacao").textContent = d.explicacao;
+  const cards = $("#cards"); cards.replaceChildren(
+    card("Dólar", "R$ " + num(r.dolar, 4)),
+    card("No dia", seta(r.dia)),
+    card("Na semana", seta(r.sem)),
+    card("Em 21 dias úteis", seta(r.mes)),
+    card("Selic (meta)", num(r.selic) + "% a.a."),
+    card("IPCA do mês", num(r.ipca) + "%"));
+  $("#texto").textContent = d.texto;
+  const selo = $("#selo");
+  selo.className = "selo " + (d.conferiu ? "ok" : "ruim");
+  selo.textContent = d.conferiu
+    ? `Números e sentido conferidos (tentativa ${d.tentativa} de ${d.tentativas})`
+    : "NÃO confere com os dados: descarte este texto";
+  $("#dados").textContent = `Entrada do modelo: data=${dataBR(r.data)} dolar=${r.dolar.toFixed(4)} dia=${pct(r.dia)} ` +
+    `sem=${pct(r.sem)} mes=${pct(r.mes)} selic=${r.selic.toFixed(2)} ipca=${r.ipca.toFixed(2)}`;
+}
+
+const SVG = "http://www.w3.org/2000/svg";
+function el(nome, attrs, texto) {
+  const e = document.createElementNS(SVG, nome);
+  for (const k in attrs) e.setAttribute(k, attrs[k]);
+  if (texto !== undefined) e.textContent = texto;
+  return e;
+}
+
+async function desenharGrafico(centro) {
+  const s = await api(`/api/serie?centro=${centro}&dias=${janela}`);
+  const box = $("#grafico");
+  if (!s.ok || s.valores.length < 2) { box.textContent = "Sem dados para o gráfico."; return; }
+  const W = 800, H = 280, ml = 58, mr = 16, mt = 14, mb = 30;
+  const v = s.valores, min = Math.min(...v), max = Math.max(...v), folga = (max - min) * 0.08 || 0.1;
+  const lo = min - folga, hi = max + folga;
+  const x = (i) => ml + (i / (v.length - 1)) * (W - ml - mr);
+  const y = (val) => mt + (1 - (val - lo) / (hi - lo)) * (H - mt - mb);
+  const svg = el("svg", { viewBox: `0 0 ${W} ${H}` });
+  for (let k = 0; k <= 3; k++) {  // linhas de grade e valores do eixo Y
+    const val = lo + ((hi - lo) * k) / 3, yy = y(val);
+    svg.append(el("line", { x1: ml, x2: W - mr, y1: yy, y2: yy, stroke: "var(--borda)", "stroke-width": 1 }));
+    svg.append(el("text", { x: ml - 8, y: yy + 4, "text-anchor": "end", "font-size": 12, fill: "var(--suave)" }, num(val, 2)));
+  }
+  const pontos = v.map((val, i) => `${x(i).toFixed(1)},${y(val).toFixed(1)}`);
+  svg.append(el("polygon", { points: `${x(0)},${H - mb} ${pontos.join(" ")} ${x(v.length - 1)},${H - mb}`, fill: "var(--area)" }));
+  svg.append(el("polyline", { points: pontos.join(" "), fill: "none", stroke: "var(--linha)", "stroke-width": 2, "stroke-linejoin": "round" }));
+  const i = s.datas.indexOf(s.escolhido);
+  if (i >= 0) {  // marca o dia escolhido
+    svg.append(el("line", { x1: x(i), x2: x(i), y1: mt, y2: H - mb, stroke: "var(--linha)", "stroke-dasharray": "4 4", "stroke-width": 1 }));
+    svg.append(el("circle", { cx: x(i), cy: y(v[i]), r: 5, fill: "var(--linha)", stroke: "var(--painel)", "stroke-width": 2 }));
+    const esq = x(i) > W * 0.7;
+    svg.append(el("text", { x: x(i) + (esq ? -9 : 9), y: Math.max(y(v[i]) - 10, mt + 12), "text-anchor": esq ? "end" : "start",
+      "font-size": 13, "font-weight": 600, fill: "var(--texto)", stroke: "var(--painel)", "stroke-width": 5,
+      "paint-order": "stroke", "stroke-linejoin": "round" }, `${dataBR(s.escolhido)}: R$ ${num(v[i], 4)}`));
+  }
+  svg.append(el("text", { x: ml, y: H - 8, "font-size": 12, fill: "var(--suave)" }, dataBR(s.datas[0])));
+  svg.append(el("text", { x: W - mr, y: H - 8, "text-anchor": "end", "font-size": 12, fill: "var(--suave)" }, dataBR(s.datas[s.datas.length - 1])));
+  box.replaceChildren(svg);
+  box.setAttribute("aria-label", `Gráfico do dólar de ${dataBR(s.datas[0])} a ${dataBR(s.datas[s.datas.length - 1])}`);
+}
+
+function montarFaixas() {
+  const f = $("#faixas");
+  FAIXAS.forEach(([nome, dias]) => {
+    const b = document.createElement("button"); b.type = "button"; b.textContent = nome;
+    b.setAttribute("aria-pressed", String(dias === janela));
+    b.onclick = async () => {
+      janela = dias;
+      f.querySelectorAll("button").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
+      if (atual) await desenharGrafico(atual.registro.data);
+    };
+    f.append(b);
+  });
+}
+
+async function iniciar() {
+  montarFaixas();
+  const info = await api("/api/info");
+  const chips = $("#chips");
+  info.exemplos.forEach((t) => {
+    const b = document.createElement("button"); b.type = "button"; b.className = "chip"; b.textContent = t;
+    b.onclick = () => { $("#pedido").value = t; pedir(t); };
+    chips.append(b);
+  });
+  $("#data").min = info.primeiro; $("#data").max = info.ultimo;
+  $("#rodape").textContent = `Modelo de ${num(info.parametros / 1e6, 2)} milhões de parâmetros rodando em ${info.dispositivo}. ` +
+    `Dados reais do Banco Central de ${dataBR(info.primeiro)} a ${dataBR(info.ultimo)}.`;
+  // link direto: http://127.0.0.1:8765/?pedido=maior%20alta%20de%202025
+  const inicial = new URLSearchParams(location.search).get("pedido");
+  if (inicial) $("#pedido").value = inicial;
+  pedir(inicial || "mais recente");
+}
+
+$("#form").addEventListener("submit", (e) => { e.preventDefault(); pedir($("#pedido").value); });
+$("#data").addEventListener("change", (e) => { if (e.target.value) { $("#pedido").value = dataBR(e.target.value); pedir(dataBR(e.target.value)); } });
+$("#denovo").addEventListener("click", () => pedir(ultimoPedido));
+iniciar();
+</script>
+</body>
+</html>

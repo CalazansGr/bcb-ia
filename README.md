@@ -24,6 +24,20 @@ que confere os números e o sentido das palavras contra os dados do Banco Centra
 
 ![O mini-LLM escreve sobre o dia mais recente](docs/exemplo-escrever.png)
 
+### Interface web (`web.bat` ou `python run.py web`)
+
+Uma página local no seu navegador: você digita um pedido, escolhe um dia no calendário ou clica em um exemplo. Ela
+mostra os números do dia, o gráfico do dólar com o dia marcado e o boletim escrito pelo mini-LLM, com o selo de
+conferência. Funciona em celular e no tema claro ou escuro.
+
+![Interface web do mini-LLM](docs/exemplo-web.png)
+
+> O servidor escuta **só em `127.0.0.1`** (apenas o seu computador acessa) e não precisa instalar nada além do que
+> o projeto já usa. Dá para abrir um pedido direto pelo endereço, ex.: `http://127.0.0.1:8765/?pedido=maior%20alta%20de%202025`.
+> A captura é a página real, aberta em um navegador.
+
+### Modo de conversa no terminal
+
 No modo de conversa (`conversar.bat`), você pede um dia: uma data, "semana passada", "maior alta de 2025"...
 O programa mostra como entendeu o pedido (linha laranja) e o mini-LLM escreve o boletim daquele dia:
 
@@ -44,8 +58,9 @@ O programa mostra como entendeu o pedido (linha laranja) e o mini-LLM escreve o 
    fica parada, sem barra de progresso). Só então vá para o passo 4.
 4. Dois cliques em **`rodar.bat`**: baixa os dados mais novos do Banco Central e o mini-LLM escreve sobre o
    dia mais recente.
-5. (Opcional) Dois cliques em **`conversar.bat`**: você pede um dia (ex.: `17/11/2026`, `semana passada`,
-   `maior alta de 2025`) e o mini-LLM escreve o boletim dele, com os dados reais.
+5. (Opcional) Dois cliques em **`web.bat`**: abre uma página no seu navegador, com calendário, gráfico do dólar
+   e o boletim escrito pelo mini-LLM. Ou **`conversar.bat`** para o mesmo no terminal: você pede um dia
+   (ex.: `17/11/2026`, `semana passada`, `maior alta de 2025`) e ele escreve o boletim, com os dados reais.
 
 Se o Windows mostrar "O Windows protegeu o computador", clique em **Mais informações → Executar assim mesmo**
 (acontece com qualquer `.bat` baixado da internet; o conteúdo é texto puro e você pode abrir no Bloco de Notas).
@@ -113,6 +128,7 @@ python run.py regimes            # k-means: o dólar está calmo, intermediário
 python run.py llm-escrever       # o mini-LLM escreve sobre o dia mais recente do BC
 python run.py llm-escrever --data 17/11/2026   # ...ou sobre uma data específica
 python run.py llm-conversar      # você pede um dia (data, "semana passada", "maior alta de 2025"...)
+python run.py web                # interface web local: calendário, gráfico e boletim
 python run.py llm-avaliar        # mede a fidelidade do mini-LLM em dias que ele nunca viu
 python run.py llm-treinar        # (opcional) treina o mini-LLM do zero
 python run.py chat               # (opcional) conversa com o Claude usando esses dados
@@ -220,6 +236,7 @@ intermediária que cita o número e o sinal.
 instalar.bat        # instala tudo (Windows, dois cliques)
 rodar.bat           # atualiza os dados e roda o mini-LLM (Windows, dois cliques)
 conversar.bat       # você pede um dia e o mini-LLM escreve o boletim (Windows, dois cliques)
+web.bat             # interface web com calendário e gráfico (Windows, dois cliques)
 run.py              # comandos
 modelos/minillm.pt  # mini-LLM já treinado (13 MB)
 src/bcb.py          # coleta da API do Banco Central (+ cache)
@@ -229,6 +246,8 @@ src/previsao.py     # previsão de vários dias com faixa de incerteza
 src/chat.py         # chat com o Claude (opcional)
 minillm/corpus.py   # dados -> texto de treino
 minillm/perguntas.py # entende o pedido ("semana passada", "maior alta") e escolhe o dia (regras simples)
+minillm/web.py      # servidor da interface web (só biblioteca padrão, só em 127.0.0.1)
+minillm/pagina.html # a página: calendário, gráfico e boletim
 minillm/modelo.py   # o mini-GPT
 minillm/treino.py   # treino, verificador, fidelidade e geração
 docs/ESCADINHA.md   # os 9 algoritmos explicados
