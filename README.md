@@ -32,6 +32,11 @@ conferência. Funciona em celular e no tema claro ou escuro.
 
 ![Interface web do mini-LLM](docs/exemplo-web.png)
 
+**Dados sempre atualizados:** ao abrir, a página mostra até que dia há cotação e **quando foi verificado**. O servidor
+consulta o Banco Central sozinho a cada 30 minutos, e o botão **Atualizar dados** força a consulta na hora. Se o último
+dia não for hoje, a página explica o porquê (fim de semana, feriado ou cotação do dia ainda não publicada). Sem
+internet, ela avisa que está usando os dados já salvos, em vez de dizer que está atualizado.
+
 > O servidor escuta **só em `127.0.0.1`** (apenas o seu computador acessa) e não precisa instalar nada além do que
 > o projeto já usa. Dá para abrir um pedido direto pelo endereço, ex.: `http://127.0.0.1:8765/?pedido=maior%20alta%20de%202025`.
 > A captura é a página real, aberta em um navegador.

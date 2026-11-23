@@ -41,6 +41,9 @@
   .chips span.rot { color: var(--suave); font-size: .85rem; margin-right: 2px; }
   .chip { padding: 4px 10px; font-size: .85rem; border-radius: 999px; background: var(--acento-fundo); border-color: transparent; }
   label.data { display: inline-flex; gap: 8px; align-items: center; color: var(--suave); font-size: .9rem; margin-top: 12px; }
+  .status { margin: 12px 0 0; color: var(--suave); font-size: .88rem; display: flex; gap: 6px 10px; align-items: center; flex-wrap: wrap; }
+  .status button { padding: 3px 10px; font-size: .82rem; }
+  #lacuna { margin-top: 4px; font-size: .82rem; }
   .nota { background: var(--nota-fundo); color: var(--nota); border-radius: 10px; padding: 9px 12px; font-size: .92rem; }
   .erro { background: var(--erro-fundo); color: var(--erro); border-radius: 10px; padding: 12px; white-space: pre-wrap; }
   .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(125px, 1fr)); gap: 10px; margin: 14px 0 4px; }
@@ -75,6 +78,8 @@
     <div class="chips" id="chips"><span class="rot">Experimente:</span></div>
     <label class="data">ou escolha um dia no calendário:
       <input type="date" id="data" aria-label="Escolher um dia"></label>
+    <p class="status" id="status"></p>
+    <p class="status" id="lacuna" hidden></p>
   </section>
 
   <div id="resultado" aria-live="polite" aria-busy="false">
@@ -236,6 +241,31 @@ function montarFaixas() {
   });
 }
 
+function mostrarInfo(info) {
+  $("#data").min = info.primeiro; $("#data").max = info.ultimo;
+  const texto = document.createElement("span");
+  texto.textContent = `Dados reais do Banco Central até ${dataBR(info.ultimo)} (verificado às ${info.verificado}).`;
+  const botao = document.createElement("button");
+  botao.type = "button"; botao.id = "atualizar"; botao.textContent = "Atualizar dados"; botao.onclick = atualizarDados;
+  const msg = document.createElement("span"); msg.id = "msgdados"; msg.textContent = info.erro || "";
+  $("#status").replaceChildren(texto, botao, msg);
+  const lac = $("#lacuna");
+  lac.hidden = info.lacuna.length === 0;
+  lac.textContent = "Desde então, sem cotação: " + info.lacuna.map((l) => `${l.quando} (${l.motivo})`).join(" · ") + ".";
+  $("#rodape").textContent = `Modelo de ${num(info.parametros / 1e6, 2)} milhões de parâmetros rodando em ${info.dispositivo}. ` +
+    `Dados de ${dataBR(info.primeiro)} a ${dataBR(info.ultimo)}.`;
+}
+
+async function atualizarDados() {
+  const b = $("#atualizar"); b.disabled = true; $("#msgdados").textContent = "Consultando o Banco Central…";
+  try {
+    const r = await api("/api/atualizar");
+    mostrarInfo(await api("/api/info"));
+    $("#msgdados").textContent = r.mensagem;
+    if (r.mudou) pedir("mais recente");
+  } catch (e) { $("#msgdados").textContent = "Não consegui atualizar: " + e; b.disabled = false; }
+}
+
 async function iniciar() {
   montarFaixas();
   const info = await api("/api/info");
@@ -245,9 +275,7 @@ async function iniciar() {
     b.onclick = () => { $("#pedido").value = t; pedir(t); };
     chips.append(b);
   });
-  $("#data").min = info.primeiro; $("#data").max = info.ultimo;
-  $("#rodape").textContent = `Modelo de ${num(info.parametros / 1e6, 2)} milhões de parâmetros rodando em ${info.dispositivo}. ` +
-    `Dados reais do Banco Central de ${dataBR(info.primeiro)} a ${dataBR(info.ultimo)}.`;
+  mostrarInfo(info);
   // link direto: http://127.0.0.1:8765/?pedido=maior%20alta%20de%202025
   const inicial = new URLSearchParams(location.search).get("pedido");
   if (inicial) $("#pedido").value = inicial;

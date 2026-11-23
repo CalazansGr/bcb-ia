@@ -23,6 +23,9 @@ SERIES = {
 INICIO_PADRAO = date(2000, 1, 3)
 DATA_DIR = Path(__file__).resolve().parent.parent / "data"
 URL = "https://api.bcb.gov.br/dados/serie/bcdata.sgs.{codigo}/dados"
+# Séries cuja última tentativa de atualização falhou (e que, por isso, estão usando o cache salvo).
+# Quem chama pode conferir: um dict vazio significa que tudo foi consultado com sucesso no Banco Central.
+ERROS: dict[str, str] = {}
 
 
 def _baixar_trecho(codigo: int, ini: date, fim: date) -> pd.DataFrame:
@@ -81,8 +84,10 @@ def carregar(nome: str, atualizar: bool = True, desde: date = INICIO_PADRAO) -> 
             cache = novo if cache is None else pd.concat([cache, novo], ignore_index=True)
             cache = cache.drop_duplicates("data", keep="last").sort_values("data")
             cache.to_csv(arq, index=False)
+            ERROS.pop(nome, None)
         except (requests.RequestException, ValueError) as e:
             cache = cache_salvo
+            ERROS[nome] = f"{type(e).__name__}: {e}"
             if cache is None:
                 raise RuntimeError(f"Não consegui baixar '{nome}' do Banco Central e não há cache: {e}") from e
             print(f"[aviso] Não consegui atualizar '{nome}' ({type(e).__name__}); usando o cache salvo.")
